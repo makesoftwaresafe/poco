@@ -102,7 +102,7 @@ public:
 	Path& operator = (const char* path);
 		/// Assigns a string containing a path in native format.
 
-	void swap(Path& path);
+	void swap(Path& path) noexcept;
 		/// Swaps the path with another one.
 
 	Path& assign(const std::string& path);
@@ -289,6 +289,10 @@ public:
 		/// On Unix systems, this is the colon ':'. On Windows systems,
 		/// this is the semicolon ';'. On OpenVMS systems, this is the
 		/// comma ','.
+
+	static std::string self();
+		/// Return path to the executable file, empty string if failed.
+		/// The path is absolute one.
 
 	static std::string current();
 		/// Returns the current working directory.
@@ -495,7 +499,7 @@ inline char Path::pathSeparator()
 }
 
 
-inline void swap(Path& p1, Path& p2)
+inline void swap(Path& p1, Path& p2) noexcept
 {
 	p1.swap(p2);
 }

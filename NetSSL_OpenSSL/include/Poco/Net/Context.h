@@ -126,6 +126,16 @@ public:
 		PROTO_TLSV1_3 = 0x20
 	};
 
+	enum SecurityLevel
+	{
+		SECURITY_LEVEL_NONE     = 0,
+		SECURITY_LEVEL_80_BITS  = 1,
+		SECURITY_LEVEL_112_BITS = 2,
+		SECURITY_LEVEL_128_BITS = 3,
+		SECURITY_LEVEL_192_BITS = 4,
+		SECURITY_LEVEL_256_BITS = 5
+	};
+
 	struct NetSSL_API Params
 	{
 		Params();
@@ -193,6 +203,11 @@ public:
 			///   and other TLSv1.3 ephemeral key negotiation, based
 			///   on the group names defined by OpenSSL. Defaults to
 			///   "X448:X25519:ffdhe4096:ffdhe3072:ffdhe2048:ffdhe6144:ffdhe8192:P-521:P-384:P-256"
+
+		SecurityLevel securityLevel;
+			/// Defines minimal number of security bits allowed.
+			/// Requires OpenSSL >= 1.1 to be effective.
+
 	};
 
 	using InvalidCertificateHandlerPtr = Poco::SharedPtr<InvalidCertificateHandler>;
@@ -274,6 +289,7 @@ public:
 	void addCertificateAuthority(const Poco::Crypto::X509Certificate& certificate);
 		/// Add one trusted certification authority to be used by the Context.
 
+	//@deprecated
 	void usePrivateKey(const Poco::Crypto::RSAKey& key);
 		/// Sets the private key to be used by the Context.
 		///
@@ -419,6 +435,24 @@ public:
 	InvalidCertificateHandlerPtr getInvalidCertificateHandler() const;
 		/// Returns the InvalidCertificateHandler set for this Context,
 		/// or a null pointer if none has been set.
+
+	void setSecurityLevel(SecurityLevel level);
+		/// Sets the security level.
+
+	void ignoreUnexpectedEof(bool flag = true);
+		/// Enable or disable SSL/TLS SSL_OP_IGNORE_UNEXPECTED_EOF
+		/// 
+		/// Some TLS implementations do not send the mandatory close_notify alert on shutdown.
+		/// If the application tries to wait for the close_notify alert
+		/// but the peer closes the connection without sending it, an error is generated.
+		/// When this option is enabled the peer does not need to send the close_notify alert
+		/// and a closed connection will be treated as if the close_notify alert was received.
+
+	void setQuietShutdown(bool flag = true);
+		/// Normally, when an SSL connection is finished, the parties must send out close_notify alert messages for a clean shutdown.
+		/// When setting the "quiet shutdown" flag to true, the SecureSocketImpl::shutdown() will set the SSL shutdown flags,
+		/// but no close_notify alert is sent to the peer. This behaviour violates the TLS standard.
+		/// The default is a normal shutdown behaviour as described by the TLS standard.
 
 private:
 	void init(const Params& params);

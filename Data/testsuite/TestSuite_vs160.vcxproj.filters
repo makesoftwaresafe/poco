@@ -2,46 +2,55 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="DataCore">
-      <UniqueIdentifier>{7e84ee0f-ec22-4e97-aeea-a8bd0ce4152e}</UniqueIdentifier>
+      <UniqueIdentifier>{42b922ac-f7ec-4cf3-89e5-71161b3188d9}</UniqueIdentifier>
     </Filter>
     <Filter Include="DataCore\Header Files">
-      <UniqueIdentifier>{f4d0b95b-288c-4d87-adc2-05a8e804d138}</UniqueIdentifier>
+      <UniqueIdentifier>{2f2a033c-7fd0-4a84-b20c-2ebde73a877c}</UniqueIdentifier>
     </Filter>
     <Filter Include="DataCore\Source Files">
-      <UniqueIdentifier>{67638b50-3c9a-49fd-8830-878198b44a4b}</UniqueIdentifier>
+      <UniqueIdentifier>{974359b2-cd44-411e-95ca-53453f48fe6d}</UniqueIdentifier>
     </Filter>
     <Filter Include="_Suite">
-      <UniqueIdentifier>{aa2eca34-420d-4002-a647-522105462d3c}</UniqueIdentifier>
+      <UniqueIdentifier>{8157a4ee-77b2-4869-aa32-24547cff53cb}</UniqueIdentifier>
     </Filter>
     <Filter Include="_Suite\Header Files">
-      <UniqueIdentifier>{77380bae-42e2-4730-bdf5-029a46b7de60}</UniqueIdentifier>
+      <UniqueIdentifier>{b3e1bbc6-2417-4448-86f3-40d76b5d9cca}</UniqueIdentifier>
     </Filter>
     <Filter Include="_Suite\Source Files">
-      <UniqueIdentifier>{bf7ee855-8def-49be-bbeb-b343f1af6e25}</UniqueIdentifier>
+      <UniqueIdentifier>{0f425069-7575-436d-82f7-ead37fa62ce3}</UniqueIdentifier>
     </Filter>
     <Filter Include="_Driver">
-      <UniqueIdentifier>{71b40c25-0a71-4af1-9c24-bd19e9f05ee5}</UniqueIdentifier>
+      <UniqueIdentifier>{00cddbc5-1cba-42b3-b568-e33c9f87f9ec}</UniqueIdentifier>
     </Filter>
     <Filter Include="_Driver\Source Files">
-      <UniqueIdentifier>{18542fbd-0f3f-4ded-bbd8-3187dacda5b9}</UniqueIdentifier>
+      <UniqueIdentifier>{502b1ab4-d378-4442-8e42-cd4ffcf1f377}</UniqueIdentifier>
     </Filter>
     <Filter Include="TestSession">
-      <UniqueIdentifier>{391c5e24-2daa-4267-95ba-ab8e4a678121}</UniqueIdentifier>
+      <UniqueIdentifier>{d60995fe-1c34-443e-9661-33447da8f2e9}</UniqueIdentifier>
     </Filter>
     <Filter Include="TestSession\Header Files">
-      <UniqueIdentifier>{0ae4b178-a34b-40fe-81eb-46e86815153a}</UniqueIdentifier>
+      <UniqueIdentifier>{8df73687-9f6d-43eb-a89f-70e7ed00f7d2}</UniqueIdentifier>
     </Filter>
     <Filter Include="TestSession\Source Files">
-      <UniqueIdentifier>{bd5d5609-7342-4cfb-95fa-4057043b296f}</UniqueIdentifier>
+      <UniqueIdentifier>{d2b0dd1f-3c3c-4566-8eb5-888f1535913d}</UniqueIdentifier>
     </Filter>
     <Filter Include="SessionPooling">
-      <UniqueIdentifier>{5f59170e-8a51-4ec5-acc8-bab9e3f5c427}</UniqueIdentifier>
+      <UniqueIdentifier>{db472067-b6d1-4aaf-8215-639e5e61dc18}</UniqueIdentifier>
     </Filter>
     <Filter Include="SessionPooling\Header Files">
-      <UniqueIdentifier>{a03c48d7-ad5a-4962-ac25-f8d3b10fc4c0}</UniqueIdentifier>
+      <UniqueIdentifier>{1413b92f-3499-4f45-a996-407435fd694d}</UniqueIdentifier>
     </Filter>
     <Filter Include="SessionPooling\Source Files">
-      <UniqueIdentifier>{777f4515-c6c8-4df2-9f01-661d208a7534}</UniqueIdentifier>
+      <UniqueIdentifier>{a3ef0da6-4143-4ce1-9547-60ec2b9f3554}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SQLParser">
+      <UniqueIdentifier>{d8258f55-ef0e-4421-95cd-07496830f7fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SQLParser\Header Files">
+      <UniqueIdentifier>{3e20014c-0e66-4f19-9655-c7a64b3b1eb9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SQLParser\Source Files">
+      <UniqueIdentifier>{1db06b52-ddad-44fd-8d8d-9c4c3a23b738}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -71,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="src\SessionPoolTest.h">
       <Filter>SessionPooling\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SQLParserTest.h">
+      <Filter>SQLParser\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -103,6 +115,9 @@
     </ClCompile>
     <ClCompile Include="src\SessionPoolTest.cpp">
       <Filter>SessionPooling\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SQLParserTest.cpp">
+      <Filter>SQLParser\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -17,26 +17,23 @@
 #include "Poco/Net/StreamSocketImpl.h"
 #include "Poco/NumberFormatter.h"
 #include "Poco/Timestamp.h"
+#include "Poco/FileStream.h"
+#include "Poco/Error.h"
 #include <string.h> // FD_SET needs memset on some platforms, so we can't use <cstring>
 
 
-#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
-#ifndef POCO_HAVE_FD_POLL
-#define POCO_HAVE_FD_POLL 1
-#endif
-#elif defined(POCO_OS_FAMILY_BSD)
-#ifndef POCO_HAVE_FD_POLL
-#define POCO_HAVE_FD_POLL 1
-#endif
-#endif
-
-
 #if defined(POCO_HAVE_FD_EPOLL)
-#include <sys/epoll.h>
+	#ifdef POCO_OS_FAMILY_WINDOWS
+		#include "wepoll.h"
+		#include "mswsock.h"
+	#else
+		#include <sys/epoll.h>
+		#include <sys/eventfd.h>
+	#endif
 #elif defined(POCO_HAVE_FD_POLL)
-#ifndef _WIN32
-#include <poll.h>
-#endif
+	#ifndef _WIN32
+		#include <poll.h>
+	#endif
 #endif
 
 
@@ -48,8 +45,20 @@
 
 #ifdef POCO_OS_FAMILY_WINDOWS
 #include <windows.h>
+#else
+#include <csignal>
 #endif
 
+
+#if POCO_OS == POCO_OS_MAC_OS_X || POCO_OS == POCO_OS_FAMILY_BSD
+#include <sys/uio.h>
+#include <sys/types.h>
+using sighandler_t = sig_t;
+#endif
+
+#if POCO_OS == POCO_OS_LINUX && !defined(POCO_EMSCRIPTEN)
+#include <sys/sendfile.h>
+#endif
 
 #if defined(_MSC_VER)
 #pragma warning(disable:4996) // deprecation warnings
@@ -61,6 +70,20 @@ using Poco::TimeoutException;
 using Poco::InvalidArgumentException;
 using Poco::NumberFormatter;
 using Poco::Timespan;
+
+
+#ifdef WEPOLL_H_
+
+namespace {
+
+	int close(HANDLE h)
+	{
+		return epoll_close(h);
+	}
+
+}
+
+#endif // WEPOLL_H_
 
 
 namespace Poco {
@@ -124,7 +147,7 @@ SocketImpl* SocketImpl::acceptConnection(SocketAddress& clientAddr)
 		return new StreamSocketImpl(sd);
 	}
 	error(); // will throw
-	return 0;
+	return nullptr;
 }
 
 
@@ -219,10 +242,15 @@ void SocketImpl::bind(const SocketAddress& address, bool reuseAddress, bool reus
 	{
 		init(address.af());
 	}
-	if (reuseAddress)
-		setReuseAddress(true);
-	if (reusePort)
-		setReusePort(true);
+
+#ifdef POCO_HAS_UNIX_SOCKET
+	if (address.family() != SocketAddress::Family::UNIX_LOCAL)
+#endif
+	{
+		setReuseAddress(reuseAddress);
+		setReusePort(reusePort);
+	}
+
 #if defined(POCO_VXWORKS)
 	int rc = ::bind(_sockfd, (sockaddr*) address.addr(), address.length());
 #else
@@ -253,15 +281,21 @@ void SocketImpl::bind6(const SocketAddress& address, bool reuseAddress, bool reu
 #else
 	if (ipV6Only) throw Poco::NotImplementedException("IPV6_V6ONLY not defined.");
 #endif
-	if (reuseAddress)
-		setReuseAddress(true);
-	if (reusePort)
-		setReusePort(true);
+	setReuseAddress(reuseAddress);
+	setReusePort(reusePort);
 	int rc = ::bind(_sockfd, address.addr(), address.length());
 	if (rc != 0) error(address.toString());
 #else
 	throw Poco::NotImplementedException("No IPv6 support available");
 #endif
+}
+
+
+void SocketImpl::useFileDescriptor(poco_socket_t fd)
+{
+	poco_assert (_sockfd == POCO_INVALID_SOCKET);
+
+	_sockfd = fd;
 }
 
 
@@ -493,7 +527,7 @@ int SocketImpl::sendTo(const SocketBufVec& buffers, const SocketAddress& address
 		msgHdr.msg_namelen = address.length();
 		msgHdr.msg_iov = const_cast<iovec*>(&buffers[0]);
 		msgHdr.msg_iovlen = buffers.size();
-		msgHdr.msg_control = 0;
+		msgHdr.msg_control = nullptr;
 		msgHdr.msg_controllen = 0;
 		msgHdr.msg_flags = flags;
 		rc = sendmsg(_sockfd, &msgHdr, flags);
@@ -579,7 +613,7 @@ int SocketImpl::receiveFrom(SocketBufVec& buffers, struct sockaddr** pSA, poco_s
 		msgHdr.msg_namelen = **ppSALen;
 		msgHdr.msg_iov = &buffers[0];
 		msgHdr.msg_iovlen = buffers.size();
-		msgHdr.msg_control = 0;
+		msgHdr.msg_control = nullptr;
 		msgHdr.msg_controllen = 0;
 		msgHdr.msg_flags = flags;
 		rc = recvmsg(_sockfd, &msgHdr, flags);
@@ -614,6 +648,13 @@ int SocketImpl::available()
 {
 	int result = 0;
 	ioctl(FIONREAD, result);
+#if (POCO_OS != POCO_OS_LINUX)
+	if (result && (type() == SOCKET_TYPE_DATAGRAM))
+	{
+		std::vector<char> buf(result);
+		result = recvfrom(sockfd(), &buf[0], result, MSG_PEEK, nullptr, nullptr);
+	}
+#endif
 	return result;
 }
 
@@ -630,9 +671,17 @@ bool SocketImpl::poll(const Poco::Timespan& timeout, int mode)
 	if (sockfd == POCO_INVALID_SOCKET) throw InvalidSocketException();
 
 #if defined(POCO_HAVE_FD_EPOLL)
-
+#ifdef WEPOLL_H_
+	HANDLE epollfd = epoll_create(1);
+#else
 	int epollfd = epoll_create(1);
+#endif
+
+#ifdef WEPOLL_H_
+	if (!epollfd)
+#else
 	if (epollfd < 0)
+#endif
 	{
 		error("Can't create epoll queue");
 	}
@@ -661,7 +710,7 @@ bool SocketImpl::poll(const Poco::Timespan& timeout, int mode)
 		memset(&evout, 0, sizeof(evout));
 
 		Poco::Timestamp start;
-		rc = epoll_wait(epollfd, &evout, 1, remainingTime.totalMilliseconds());
+		rc = epoll_wait(epollfd, &evout, 1, static_cast<int>(remainingTime.totalMilliseconds()));
 		if (rc < 0 && lastError() == POCO_EINTR)
 		{
 			Poco::Timestamp end;
@@ -756,6 +805,14 @@ bool SocketImpl::poll(const Poco::Timespan& timeout, int mode)
 	return rc > 0;
 
 #endif // POCO_HAVE_FD_EPOLL
+}
+
+
+int SocketImpl::getError()
+{
+	int result;
+	getOption(SOL_SOCKET, SO_ERROR, result);
+	return result;
 }
 
 
@@ -1027,14 +1084,25 @@ void SocketImpl::setReuseAddress(bool flag)
 {
 	int value = flag ? 1 : 0;
 	setOption(SOL_SOCKET, SO_REUSEADDR, value);
+#ifdef POCO_OS_FAMILY_WINDOWS
+	value = flag ? 0 : 1;
+	setOption(SOL_SOCKET, SO_EXCLUSIVEADDRUSE, value);
+#endif
 }
 
 
 bool SocketImpl::getReuseAddress()
 {
+	bool ret = false;
 	int value(0);
 	getOption(SOL_SOCKET, SO_REUSEADDR, value);
-	return value != 0;
+	ret = (value != 0);
+#ifdef POCO_OS_FAMILY_WINDOWS
+	value = 0;
+	getOption(SOL_SOCKET, SO_EXCLUSIVEADDRUSE, value);
+	ret = ret && (value == 0);
+#endif
+	return ret;
 }
 
 
@@ -1046,7 +1114,7 @@ void SocketImpl::setReusePort(bool flag)
 		int value = flag ? 1 : 0;
 		setOption(SOL_SOCKET, SO_REUSEPORT, value);
 	}
-	catch (IOException&)
+	catch (const IOException&)
 	{
 		// ignore error, since not all implementations
 		// support SO_REUSEPORT, even if the macro
@@ -1305,5 +1373,81 @@ void SocketImpl::error(int code, const std::string& arg)
 	}
 }
 
+#ifdef POCO_OS_FAMILY_WINDOWS
+Poco::Int64 SocketImpl::sendFile(FileInputStream &fileInputStream, Poco::UInt64 offset)
+{
+	FileIOS::NativeHandle fd = fileInputStream.nativeHandle();
+	Poco::UInt64 fileSize = fileInputStream.size();
+	std::streamoff sentSize = fileSize - offset;
+	LARGE_INTEGER offsetHelper;
+	offsetHelper.QuadPart = offset;
+	OVERLAPPED overlapped;
+	memset(&overlapped, 0, sizeof(overlapped));
+	overlapped.Offset = offsetHelper.LowPart;
+	overlapped.OffsetHigh =  offsetHelper.HighPart;
+	overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (overlapped.hEvent == nullptr)
+	{
+		return -1;
+	}
+	bool result = TransmitFile(_sockfd, fd, sentSize, 0, &overlapped, nullptr, 0);
+	if (!result)
+	{
+		int err = WSAGetLastError();
+		if ((err != ERROR_IO_PENDING) && (WSAGetLastError() != WSA_IO_PENDING)) {
+			CloseHandle(overlapped.hEvent);
+			error(err, Error::getMessage(err));
+		}
+		WaitForSingleObject(overlapped.hEvent, INFINITE);
+	}
+	CloseHandle(overlapped.hEvent);
+	return sentSize;
+}
+#else
+Poco::Int64 _sendfile(poco_socket_t sd, FileIOS::NativeHandle fd, Poco::UInt64 offset,std::streamoff sentSize)
+{
+	Poco::Int64 sent = 0;
+#ifdef __USE_LARGEFILE64
+	sent = sendfile64(sd, fd, (off64_t *)&offset, sentSize);
+#else
+#if POCO_OS == POCO_OS_LINUX && !defined(POCO_EMSCRIPTEN)
+	sent = sendfile(sd, fd, (off_t *)&offset, sentSize);
+#elif POCO_OS == POCO_OS_MAC_OS_X
+	int result = sendfile(fd, sd, offset, &sentSize, nullptr, 0);
+	if (result < 0)
+	{
+		sent = -1;
+	} 
+	else 
+	{
+		sent = sentSize;
+	}
+#else
+	throw Poco::NotImplementedException("sendfile not implemented for this platform");
+#endif
+#endif
+	if (errno == EAGAIN || errno == EWOULDBLOCK) 
+	{
+		sent = 0;
+	}
+	return sent;
+}
+
+Poco::Int64 SocketImpl::sendFile(FileInputStream &fileInputStream, Poco::UInt64 offset)
+{
+	FileIOS::NativeHandle fd = fileInputStream.nativeHandle();
+	Poco::UInt64 fileSize = fileInputStream.size();
+	std::streamoff sentSize = fileSize - offset;
+	Poco::Int64 sent = 0;
+	sighandler_t sigPrev = signal(SIGPIPE, SIG_IGN);
+	while (sent == 0)
+	{
+		errno = 0;
+		sent = _sendfile(_sockfd, fd, offset, sentSize);
+	}
+	signal(SIGPIPE, sigPrev != SIG_ERR ? sigPrev : SIG_DFL);
+	return sent;
+}
+#endif // POCO_OS_FAMILY_WINDOWS
 
 } } // namespace Poco::Net

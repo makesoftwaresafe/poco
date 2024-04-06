@@ -5,7 +5,7 @@ rem
 rem buildwin.cmd
 rem
 rem POCO C++ Libraries command-line build script
-rem for MS Visual Studio 2015 to 2019
+rem for MS Visual Studio 2015 to 2022
 rem
 rem Copyright (c) 2006-2020 by Applied Informatics Software Engineering GmbH
 rem and Contributors.
@@ -20,7 +20,7 @@ rem VS_VERSION:    140|150|160|170
 rem ACTION:        build|rebuild|clean
 rem LINKMODE:      static_mt|static_md|shared|all
 rem CONFIGURATION: release|debug|both
-rem PLATFORM:      Win32|x64
+rem PLATFORM:      Win32|x64|ARM64
 rem SAMPLES:       samples|nosamples
 rem TESTS:         tests|notests
 rem TOOL:          devenv|vcexpress|wdexpress|msbuild
@@ -37,10 +37,11 @@ rem VS_VERSION {140 | 150 | 160 | 170}
 if "%1"=="" goto usage
 
 rem -version ^^[16.0^^,17.0^^)
-set VS_VERSION=vs%1
 rem  should be set "VSWHERE='%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe  -property installationPath -version ^[16.0^,17.0^)'"
+
+set VS_VERSION=vs%1
 if %VS_VERSION%==vs170 (
-  set "VSWHERE='C:\PROGRA~2\"Microsoft Visual Studio"\Installer\vswhere.exe  -latest -property installationPath -version ^[16.0^,17.0^)'"
+  set "VSWHERE='C:\PROGRA~2\"Microsoft Visual Studio"\Installer\vswhere.exe  -latest -property installationPath -version ^[17.0^,18.0^)'"
 ) else (
 if %VS_VERSION%==vs160 (
   set "VSWHERE='C:\PROGRA~2\"Microsoft Visual Studio"\Installer\vswhere.exe  -latest -property installationPath -version ^[16.0^,17.0^)'"
@@ -99,7 +100,8 @@ rem PLATFORM [Win32|x64]
 set PLATFORM=%3
 if "%PLATFORM%"=="" (set PLATFORM=Win32)
 if not "%PLATFORM%"=="Win32" (
-if not "%PLATFORM%"=="x64" goto usage)
+if not "%PLATFORM%"=="x64" (
+if not "%PLATFORM%"=="ARM64" goto usage))
 
 rem SAMPLES [samples|nosamples]
 set SAMPLES=%4
@@ -133,9 +135,13 @@ if not defined VCINSTALLDIR (
       ) else (
         if %VS_VERSION%==vs170 (
           if %PLATFORM%==x64 (
-            call "%VS170COMNTOOLS%%VS_VARSALL%" x86_amd64 8.1
+            call "%VS170COMNTOOLS%%VS_VARSALL%" x86_amd64
           ) else (
-            call "%VS170COMNTOOLS%%VS_VARSALL%" x86 8.1
+            if %PLATFORM%==arm64 (
+              call "%VS170COMNTOOLS%%VS_VARSALL%" x86_arm64
+            ) else (
+              call "%VS170COMNTOOLS%%VS_VARSALL%" x86
+            )
           )
         )
       )
@@ -185,7 +191,8 @@ if "%VS_VERSION%"=="vs170" (set BUILD_TOOL=msbuild)
 if "%BUILD_TOOL%"=="msbuild" (
   if "%PLATFORM%"=="Win32" (set PLATFORMSW=/p:Platform=Win32) else (
   if "%PLATFORM%"=="x86"   (set PLATFORMSW=/p:Platform=Win32) else (
-  if "%PLATFORM%"=="x64"   (set PLATFORMSW=/p:Platform=x64)))
+  if "%PLATFORM%"=="x64"   (set PLATFORMSW=/p:Platform=x64) else (
+  if "%PLATFORM%"=="ARM64"   (set PLATFORMSW=/p:Platform=ARM64))))
 
   set ACTIONSW=/t:
   set CONFIGSW=/p:Configuration=
@@ -597,7 +604,7 @@ echo VS_VERSION:    "140|150|160|170"
 echo ACTION:        "build|rebuild|clean"
 echo LINKMODE:      "static_mt|static_md|shared|all"
 echo CONFIGURATION: "release|debug|both"
-echo PLATFORM:      "Win32|x64"
+echo PLATFORM:      "Win32|x64|ARM64"
 echo SAMPLES:       "samples|nosamples"
 echo TESTS:         "tests|notests"
 echo TOOL:          "devenv|vcexpress|wdexpress|msbuild"

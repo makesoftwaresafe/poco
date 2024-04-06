@@ -269,6 +269,16 @@ Command Command::hvals(const std::string& hash)
 }
 
 
+Command Command::keys(const std::string& pattern)
+{
+	Command cmd("KEYS");
+
+	cmd << pattern;
+
+	return cmd;
+}
+
+
 Command Command::incr(const std::string& key, Int64 by)
 {
 	Command cmd(by == 0 ? "INCR" : "INCRBY");
@@ -730,6 +740,24 @@ Command Command::exec()
 Command Command::discard()
 {
 	Command cmd("DISCARD");
+
+	return cmd;
+}
+
+
+Command Command::auth(const std::string& password)
+{
+	Command cmd("AUTH");
+	cmd << password;
+
+	return cmd;
+}
+
+
+Command Command::auth(const std::string& username, const std::string& password)
+{
+	Command cmd("AUTH");
+	cmd << username << password;
 
 	return cmd;
 }

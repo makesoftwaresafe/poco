@@ -25,9 +25,7 @@ target_link_libraries(DataPostgreSQL PUBLIC Poco::Data PostgreSQL::client)
 target_include_directories(DataPostgreSQL
 	PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-		$<INSTALL_INTERFACE:include>
-	PRIVATE
-		${CMAKE_CURRENT_SOURCE_DIR}/src
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 POCO_INSTALL(DataPostgreSQL)

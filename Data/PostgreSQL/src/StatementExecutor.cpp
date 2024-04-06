@@ -72,8 +72,9 @@ namespace Data {
 namespace PostgreSQL {
 
 
-StatementExecutor::StatementExecutor(SessionHandle& sessionHandle):
+StatementExecutor::StatementExecutor(SessionHandle& sessionHandle, bool binaryExtraction):
 	_sessionHandle(sessionHandle),
+	_binaryExtraction(binaryExtraction),
 	_state(STMT_INITED),
 	_pResultHandle(0),
 	_countPlaceholdersInSQLStatement(0),
@@ -142,13 +143,18 @@ void StatementExecutor::prepare(const std::string& aSQLStatement)
 	}
 
 	{
+                // get the sqlState
+                const char* pSQLState	= PQresultErrorField(ptrPGResult, PG_DIAG_SQLSTATE);		
+
 		// setup to clear the result from PQprepare
 		PQResultClear resultClearer(ptrPGResult);
 
-		if	(!ptrPGResult || PQresultStatus(ptrPGResult) != PGRES_COMMAND_OK)
+                //
+		if  (!ptrPGResult || PQresultStatus(ptrPGResult) != PGRES_COMMAND_OK )
 		{
-			throw StatementException(std::string("postgresql_stmt_prepare error: ") + PQresultErrorMessage (ptrPGResult) + " " + aSQLStatement);
+			throw StatementException(std::string("postgresql_stmt_prepare error: ") + PQresultErrorMessage (ptrPGResult) + " " + aSQLStatement,pSQLState);
 		}
+
 	}
 
 	// Determine what the structure of a statement result will look like
@@ -158,11 +164,15 @@ void StatementExecutor::prepare(const std::string& aSQLStatement)
 	}
 
 	{
+ 		// get the sqlState
+                const char* pSQLState	= PQresultErrorField(ptrPGResult, PG_DIAG_SQLSTATE);
+	
 		PQResultClear resultClearer(ptrPGResult);
+
 		if (!ptrPGResult || PQresultStatus(ptrPGResult) != PGRES_COMMAND_OK)
 		{
 			throw StatementException(std::string("postgresql_stmt_describe error: ") +
-				PQresultErrorMessage (ptrPGResult) + " " + aSQLStatement);
+				PQresultErrorMessage (ptrPGResult) + " " + aSQLStatement,pSQLState);
 		}
 
 		// remember the structure of the statement result
@@ -248,11 +258,12 @@ void StatementExecutor::execute()
 	{
 		Poco::FastMutex::ScopedLock mutexLocker(_sessionHandle.mutex());
 
-		ptrPGResult = PQexecPrepared (_sessionHandle,
+		ptrPGResult = PQexecPrepared(_sessionHandle,
 			_preparedStatementName.c_str(), (int)_countPlaceholdersInSQLStatement,
 			_inputParameterVector.size() != 0 ? &pParameterVector[ 0 ] : 0,
 			_inputParameterVector.size() != 0 ? &parameterLengthVector[ 0 ] : 0,
-			_inputParameterVector.size() != 0 ? &parameterFormatVector[ 0 ] : 0, 0);
+			_inputParameterVector.size() != 0 ? &parameterFormatVector[ 0 ] : 0,
+			_binaryExtraction ? 1 : 0);
 	}
 
 	// Don't setup to auto clear the result (ptrPGResult).  It is required to retrieve the results later.
@@ -268,13 +279,14 @@ void StatementExecutor::execute()
 		const char* pHint		= PQresultErrorField(ptrPGResult, PG_DIAG_MESSAGE_HINT);
 		const char* pConstraint	= PQresultErrorField(ptrPGResult, PG_DIAG_CONSTRAINT_NAME);
 
+                
 		throw StatementException(std::string("postgresql_stmt_execute error: ")
 			+ PQresultErrorMessage (ptrPGResult)
 			+ " Severity: " + (pSeverity   ? pSeverity   : "N/A")
 			+ " State: " + (pSQLState   ? pSQLState   : "N/A")
 			+ " Detail: " + (pDetail ? pDetail : "N/A")
 			+ " Hint: " + (pHint   ? pHint   : "N/A")
-			+ " Constraint: " + (pConstraint ? pConstraint : "N/A"));
+			+ " Constraint: " + (pConstraint ? pConstraint : "N/A"),pSQLState);
 	}
 
 	_pResultHandle = ptrPGResult;

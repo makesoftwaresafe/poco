@@ -21,6 +21,14 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Windows DLLs are "runtime" for CMake. Output them to "bin" like the Visual Studio projects do.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Reset output dirs for multi-config builds
+foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+	string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/bin)
+	set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/lib)
+	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/lib)
+endforeach(OUTPUTCONFIG)
+
 # Append our module directory to CMake
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -34,21 +42,24 @@ endif()
 # Setup C/C++ compiler options
 #################################################################################
 
-# C++11/14 compiler flags
+# C++17 compiler flags
 include(CXX1x)
-check_for_cxx14_compiler(CXX14_COMPILER)
+check_for_cxx17_compiler(CXX17_COMPILER)
 
-# If a C++14 compiler is available, then set the appropriate flags
-if(CXX14_COMPILER)
-	set(CMAKE_CXX_STANDARD 14)
+# If a C++17 compiler is available, then set the appropriate flags
+if(CXX17_COMPILER)
+	set(CMAKE_CXX_STANDARD 17)
 	set(CMAKE_CXX_STANDARD_REQUIRED ON)
 else()
-	message(FATAL_ERROR "Compiler does not support C++14.")
+	message(FATAL_ERROR "Compiler does not support C++17.")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
+
+# Enable standard installation directories
+include(GNUInstallDirs)
 
 # Include some common macros to simpilfy the Poco CMake files
 include(PocoMacros)
@@ -75,6 +86,11 @@ if(MSVC)
 	if((NOT POCO_DISABLE_INTERNAL_OPENSSL) AND (ENABLE_NETSSL OR ENABLE_CRYPTO OR (ENABLE_DATA_MYSQL AND MINGW)))
 		include(UseEmbeddedOpenSSL)
 	endif()
+
+	if(POCO_SANITIZE_ASAN)
+		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
+	endif()
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus")
 endif()
 
 option(ENABLE_NETSSL_WIN "Enable NetSSL Windows" OFF)
@@ -156,7 +172,7 @@ else()
 endif()
 
 # Allow enabling and disabling components
-option(ENABLE_FOUNDATION "Enable Foundation, required by all components except CppUnit" ON)
+option(ENABLE_FOUNDATION "Enable Foundation" ON)
 option(ENABLE_ENCODINGS "Enable Encodings" ON)
 option(ENABLE_ENCODINGS_COMPILER "Enable Encodings Compiler" OFF)
 option(ENABLE_XML "Enable XML" ON)
@@ -164,6 +180,7 @@ option(ENABLE_JSON "Enable JSON" ON)
 option(ENABLE_MONGODB "Enable MongoDB" ON)
 option(ENABLE_DATA_SQLITE "Enable Data SQlite" ON)
 option(ENABLE_REDIS "Enable Redis" ON)
+option(ENABLE_PROMETHEUS "Enable Prometheus" ON)
 option(ENABLE_PDF "Enable PDF" OFF)
 option(ENABLE_UTIL "Enable Util" ON)
 option(ENABLE_NET "Enable Net" ON)
@@ -182,8 +199,21 @@ if(ENABLE_ACTIVERECORD AND NOT ENABLE_DATA)
   set(ENABLE_DATA ON CACHE BOOL "Enable Data" FORCE)
 endif()
 
+if(ENABLE_ACTIVERECORD AND NOT ENABLE_XML)
+  set(ENABLE_XML ON CACHE BOOL "Enable XML" FORCE)
+endif()
+
 option(ENABLE_TESTS
-	"Set to OFF|ON (default is OFF) to control build of POCO tests & samples" OFF)
+	"Set to OFF|ON (default is OFF) to control build of POCO tests" OFF)
+
+option(ENABLE_TEST_DEPRECATED
+	"Set to OFF|ON (default is OFF) to enable build of tests for deprecated functionality" OFF)
+
+option(ENABLE_COMPILER_WARNINGS
+	"Set to OFF|ON (default is OFF) to enable additional compiler warnings. Intended primarily for maintainers." OFF)
+
+option(ENABLE_SAMPLES
+	"Set to OFF|ON (default is OFF) to control build of POCO samples" OFF)
 
 option(POCO_UNBUNDLED
 	"Set to OFF|ON (default is OFF) to control linking dependencies as external" OFF)
@@ -192,14 +222,17 @@ if(ENABLE_TESTS)
 	include(CTest)
 	enable_testing()
 	message(STATUS "Building with unittests & samples")
+	if(ENABLE_TEST_DEPRECATED)
+		add_compile_definitions(POCO_TEST_DEPRECATED)
+	endif()
 else()
 	message(STATUS "Building without tests & samples")
 endif()
 
 if(POCO_UNBUNDLED)
-	message(STATUS "Using external sqlite, zlib, pcre, expat, ...")
+	message(STATUS "Using external sqlite, zlib, pcre2, expat, ...")
 else()
-	message(STATUS "Using internal sqlite, zlib, pcre, expat, ...")
+	message(STATUS "Using internal sqlite, zlib, pcre2, expat, ...")
 endif()
 
 # Disable fork exec
@@ -209,6 +242,11 @@ if(POCO_NO_FORK_EXEC)
   add_definitions(-DPOCO_NO_FORK_EXEC=1)
 endif()
 
+option(POCO_ENABLE_STD_MUTEX "Set to OFF|NO using mutex from standard library (default OFF)" OFF)
+
+if (POCO_ENABLE_STD_MUTEX)
+	add_definitions(-DPOCO_ENABLE_STD_MUTEX)
+endif ()
 include(DefinePlatformSpecifc)
 
 # Collect the built libraries and include dirs, the will be used to create the PocoConfig.cmake file
@@ -234,7 +272,7 @@ if(ENABLE_PAGECOMPILER)
 	set(ENABLE_UTIL ON CACHE BOOL "Enable Util" FORCE)
 endif()
 
-if(ENABLE_MONGODB OR ENABLE_REDIS)
+if(ENABLE_MONGODB OR ENABLE_REDIS OR ENABLE_PROMETHEUS)
 	set(ENABLE_NET ON CACHE BOOL "Enable Net" FORCE)
 endif()
 
@@ -256,9 +294,6 @@ endif()
 
 if(ENABLE_NETSSL_WIN)
 	set(ENABLE_UTIL ON CACHE BOOL "Enable Util" FORCE)
-	if(ENABLE_TESTS)
-		set(ENABLE_CRYPTO ON CACHE BOOL "Enable Crypto" FORCE)
-	endif()
 endif()
 
 if(ENABLE_NETSSL)
@@ -337,6 +372,11 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/Redis AND ENABLE_REDIS)
 	list(APPEND Poco_COMPONENTS "Redis")
 endif()
 
+if(EXISTS ${PROJECT_SOURCE_DIR}/Prometheus AND ENABLE_PROMETHEUS)
+	add_subdirectory(Prometheus)
+	list(APPEND Poco_COMPONENTS "Prometheus")
+endif()
+
 if(EXISTS ${PROJECT_SOURCE_DIR}/PDF AND ENABLE_PDF)
 	add_subdirectory(PDF)
 	list(APPEND Poco_COMPONENTS "PDF")
@@ -365,9 +405,27 @@ if(OPENSSL_FOUND)
 	endif()
 endif(OPENSSL_FOUND)
 
+
+option(POCO_DATA_NO_SQL_PARSER "Disable SQL parser" OFF)
+
 if(EXISTS ${PROJECT_SOURCE_DIR}/Data AND ENABLE_DATA)
+	if(POCO_DATA_NO_SQL_PARSER)
+		add_definitions(-DPOCO_DATA_NO_SQL_PARSER=1)
+	endif()
 	add_subdirectory(Data)
 	list(APPEND Poco_COMPONENTS "Data")
+endif()
+
+if(EXISTS ${PROJECT_SOURCE_DIR}/Data/SQLite AND ENABLE_DATA_SQLITE)
+	list(APPEND Poco_COMPONENTS "Data/SQLite")
+endif()
+
+if(EXISTS ${PROJECT_SOURCE_DIR}/Data/MySQL AND ENABLE_DATA_MYSQL)
+	list(APPEND Poco_COMPONENTS "Data/MySQL")
+endif()
+
+if(EXISTS ${PROJECT_SOURCE_DIR}/Data/PostgreSQL AND ENABLE_DATA_POSTGRESQL)
+	list(APPEND Poco_COMPONENTS "Data/PostgreSQL")
 endif()
 
 if(EXISTS ${PROJECT_SOURCE_DIR}/ActiveRecord AND ENABLE_ACTIVERECORD)
@@ -380,12 +438,12 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/ActiveRecord/Compiler AND ENABLE_ACTIVERECORD_CO
 	list(APPEND Poco_COMPONENTS "ActiveRecordCompiler")
 endif()
 
-if(EXISTS ${PROJECT_SOURCE_DIR}/SevenZip AND ENABLE_SEVENZIP)
+if(EXISTS ${PROJECT_SOURCE_DIR}/SevenZip AND ENABLE_SEVENZIP AND ENABLE_XML)
 	add_subdirectory(SevenZip)
 	list(APPEND Poco_COMPONENTS "SevenZip")
 endif()
 
-if(EXISTS ${PROJECT_SOURCE_DIR}/Zip AND ENABLE_ZIP)
+if(EXISTS ${PROJECT_SOURCE_DIR}/Zip AND ENABLE_ZIP AND ENABLE_XML)
 	add_subdirectory(Zip)
 	list(APPEND Poco_COMPONENTS "Zip")
 endif()
@@ -436,7 +494,9 @@ add_custom_target(uninstall
 #############################################################
 # Enable packaging
 
-include(InstallRequiredSystemLibraries)
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+	include(InstallRequiredSystemLibraries)
+endif()
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Poco Libraries")
 set(CPACK_PACKAGE_VENDOR "Applied Informatics Software Engineering GmbH")
@@ -462,7 +522,7 @@ write_basic_package_version_file(
 if(WIN32)
 	set(PocoConfigPackageLocation "cmake")
 else()
-	set(PocoConfigPackageLocation "lib${LIB_SUFFIX}/cmake/${PROJECT_NAME}")
+	set(PocoConfigPackageLocation "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 endif()
 
 configure_file(cmake/${PROJECT_NAME}Config.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/${PROJECT_NAME}Config.cmake" @ONLY)
@@ -477,7 +537,7 @@ install(
 )
 
 if(POCO_UNBUNDLED)
-	install(FILES cmake/FindPCRE.cmake
+	install(FILES cmake/FindPCRE2.cmake
 			DESTINATION "${PocoConfigPackageLocation}")
 	install(FILES cmake/V39/FindEXPAT.cmake
 			DESTINATION "${PocoConfigPackageLocation}/V39")
@@ -503,6 +563,7 @@ message(STATUS "[cmake] Build type:             ${CMAKE_BUILD_TYPE}")
 string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
 message(STATUS "[cmake] Build with cxx flags:   ${CMAKE_CXX_FLAGS_${BUILD_TYPE}} ${CMAKE_CXX_FLAGS}")
 message(STATUS "[cmake] Build with c flags:     ${CMAKE_C_FLAGS_${BUILD_TYPE}} ${CMAKE_C_FLAGS}")
+message(STATUS "[cmake] C++ symbol visibility:  ${CMAKE_CXX_VISIBILITY_PRESET}")
 
 foreach(component ${Poco_COMPONENTS})
 	message(STATUS "Building: ${component}")

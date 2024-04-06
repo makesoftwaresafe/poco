@@ -32,6 +32,7 @@ public:
 	SQLiteTest(const std::string& name);
 	~SQLiteTest();
 
+	void testBind();
 	void testBinding();
 	void testZeroRows();
 	void testSimpleAccess();
@@ -74,8 +75,10 @@ public:
 	void testIllegalRange();
 	void testSingleSelect();
 	void testEmptyDB();
+	void testNonexistingDB();
 
 	void testCLOB();
+	void testBLOB();
 
 	void testTuple1();
 	void testTupleVector1();
@@ -136,6 +139,7 @@ public:
 	void testFTS3();
 
 	void testIllegalFilePath();
+	void testTransactionTypeProperty();
 
 	void setUp();
 	void tearDown();
