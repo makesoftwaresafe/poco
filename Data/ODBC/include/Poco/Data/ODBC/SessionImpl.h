@@ -81,6 +81,9 @@ public:
 	Poco::SharedPtr<Poco::Data::StatementImpl> createStatementImpl();
 		/// Returns an ODBC StatementImpl
 
+	void addFeatures();
+		/// Adds the ODBC session features and properties.
+
 	void open(const std::string& connect = "");
 		/// Opens a connection to the Database
 
@@ -158,6 +161,14 @@ public:
 	int maxStatementLength() const;
 		/// Returns maximum length of SQL statement allowed by driver.
 
+	void setLoginTimeout(const std::string&, const Poco::Any& value);
+		/// Sets the timeout (in seconds) for the session login.
+		/// Value must be of type (unsigned) int.
+		/// It must be set prior to logging in.
+
+	Poco::Any getLoginTimeout(const std::string&) const;
+		/// Returns the timeout (in seconds) for the session login.
+
 	void setQueryTimeout(const std::string&, const Poco::Any& value);
 		/// Sets the timeout (in seconds) for queries.
 		/// Value must be of type int.
@@ -188,6 +199,14 @@ public:
 
 	const std::string& dbEncoding() const;
 		/// Returns the database encoding.
+
+	void setMultiActiveResultset(const std::string&, bool value);
+		/// Sets the multiple active resultset capability, if available.
+		/// Does nothing, if feature is not available.
+
+	bool getMultiActiveResultset(const std::string&) const;
+		/// Returns the multiple active resultset capability, if available.
+		/// Returns false, if feature is not available.
 
 	const ConnectionHandle& dbc() const;
 		/// Returns the connection handle.
@@ -298,6 +317,12 @@ inline const std::string& SessionImpl::connectorName() const
 inline bool SessionImpl::isTransactionIsolation(Poco::UInt32 ti) const
 {
 	return 0 != (ti & getTransactionIsolation());
+}
+
+
+inline Poco::Any SessionImpl::getLoginTimeout(const std::string&) const
+{
+	return _db.getLoginTimeout();
 }
 
 

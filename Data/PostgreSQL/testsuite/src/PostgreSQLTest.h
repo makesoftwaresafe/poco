@@ -36,6 +36,7 @@ public:
 	~PostgreSQLTest();
 
 	void testConnectNoDB();
+	void testFailedConnect();
 	void testPostgreSQLOIDs();
 	void testBarebonePostgreSQL();
 
@@ -109,8 +110,8 @@ public:
 	void testBinaryCLOBStmt();
 
 	void testSessionTransaction();
+	void testSessionTransactionNoAutoCommit();
 	void testTransaction();
-
 	void testReconnect();
 
 	void testSqlState();

@@ -55,7 +55,7 @@ const bool        ODBCTest::_bindValues[8] =
 
 ODBCTest::ODBCTest(const std::string& name,
 	SessionPtr pSession,
-	ExecPtr    pExecutor,
+	ExecPtr pExecutor,
 	std::string& rDSN,
 	std::string& rUID,
 	std::string& rPwd,
@@ -1206,6 +1206,36 @@ void ODBCTest::testSQLLogger()
 }
 
 
+void ODBCTest::testAutoCommit()
+{
+	if (!_pSession) fail ("Test not available.");
+
+	for (int i = 0; i < 8;)
+	{
+		recreatePersonTable();
+		_pSession->setFeature("autoBind", bindValue(i));
+		_pSession->setFeature("autoExtract", bindValue(i+1));
+		_pExecutor->autoCommit(_rConnectString);
+		i += 2;
+	}
+}
+
+
+void ODBCTest::testTransactionIsolation()
+{
+	if (!_pSession) fail ("Test not available.");
+
+	for (int i = 0; i < 8;)
+	{
+		recreatePersonTable();
+		_pSession->setFeature("autoBind", bindValue(i));
+		_pSession->setFeature("autoExtract", bindValue(i+1));
+		_pExecutor->transactionIsolation();
+		i += 2;
+	}
+}
+
+
 void ODBCTest::testSessionTransaction()
 {
 	if (!_pSession) fail ("Test not available.");
@@ -1221,6 +1251,21 @@ void ODBCTest::testSessionTransaction()
 }
 
 
+void ODBCTest::testSessionTransactionNoAutoCommit()
+{
+	if (!_pSession) fail ("Test not available.");
+
+	for (int i = 0; i < 8;)
+	{
+		recreatePersonTable();
+		_pSession->setFeature("autoBind", bindValue(i));
+		_pSession->setFeature("autoExtract", bindValue(i+1));
+		_pExecutor->sessionTransactionNoAutoCommit(_rConnectString);
+		i += 2;
+	}
+}
+
+
 void ODBCTest::testTransaction()
 {
 	if (!_pSession) fail ("Test not available.");
@@ -1230,7 +1275,7 @@ void ODBCTest::testTransaction()
 		recreatePersonTable();
 		_pSession->setFeature("autoBind", bindValue(i));
 		_pSession->setFeature("autoExtract", bindValue(i+1));
-		_pExecutor->transaction(_rConnectString);
+		_pExecutor->transaction(_rConnectString, _readUncommitted);
 		i += 2;
 	}
 }

@@ -340,11 +340,27 @@ void PollSetTest::testPollNoServer()
 	// should be like this, but Linux epoll disagrees ...
 	//assertEqual(0, static_cast<int>(ps.poll(Timespan(100)).size()));
 
-	ss1.connectNB(SocketAddress("127.0.0.1", 0xFEFE));
-	ss2.connectNB(SocketAddress("127.0.0.1", 0xFEFF));
+	ss1.setBlocking(true);
+	ss2.setBlocking(true);
+	try
+	{
+		ss1.connect(SocketAddress("127.0.0.1", 0xFFFF));
+		fail("connection must fail", __LINE__, __FILE__);
+	}
+	catch (Poco::Net::ConnectionRefusedException&) {}
+	catch (Poco::Net::NetException&) {}
+	catch (Poco::Exception&) {}
+
+	try
+	{
+		ss2.connect(SocketAddress("127.0.0.1", 0xFFFF));
+		fail("connection must fail", __LINE__, __FILE__);
+	}
+	catch (Poco::Net::ConnectionRefusedException&) {}
+	catch (Poco::Net::NetException&) {}
+	catch (Poco::Exception&) {}
 
 	assertEqual(2, ps.poll(Timespan(1000000)).size());
-	
 }
 
 
@@ -387,9 +403,19 @@ void PollSetTest::testPollClosedServer()
 				"waiting on server after %ds", secs), __LINE__);
 		}
 	}
-
+	char buffer[5];
+	int n = ss1.receiveBytes(buffer, sizeof(buffer));
+	assertTrue(n == 0);
+	auto smm = ps.poll(Timespan(1000000));
+	assertEqual(1, smm.size());
+	assertTrue(ss1 == smm.begin()->first);
+	ps.remove(ss1);
+	assertTrue(!ps.empty());
+	assertTrue(!ps.has(ss1));
+	assertTrue(ps.has(ss2));
 	echoServer2.stop();
 	assertTrue (len == ss2.sendBytes(str.data(), len));
+	sw.restart();
 	while (!echoServer2.done())
 	{
 		Thread::sleep(10);
@@ -400,8 +426,11 @@ void PollSetTest::testPollClosedServer()
 				"waiting on server after %ds", secs), __LINE__);
 		}
 	}
-
-	assertEqual(2, ps.poll(Timespan(1000000)).size());
+	n = ss2.receiveBytes(buffer, sizeof(buffer));
+	assertTrue(n == 0);
+	smm = ps.poll(Timespan(1000000));
+	assertEqual(1, smm.size());
+	assertTrue(ss2 == smm.begin()->first);
 
 	// socket closed or error
 	assertTrue(0 >= ss1.receiveBytes(0, 0));

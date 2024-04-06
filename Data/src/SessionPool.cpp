@@ -78,7 +78,7 @@ Session SessionPool::get()
 			customizeSession(newSession);
 
 			PooledSessionHolderPtr pHolder(new PooledSessionHolder(*this, newSession.impl()));
-			_idleSessions.push_front(pHolder);
+			_idleSessions.push_back(pHolder);
 			++_nSessions;
 		}
 		else throw SessionPoolExhaustedException(_connector);
@@ -261,7 +261,7 @@ void SessionPool::putBack(PooledSessionHolderPtr pHolder)
 				applySettings(pHolder->session());
 
 				pHolder->access();
-				_idleSessions.push_front(pHolder);
+				_idleSessions.push_back(pHolder);
 			}
 			else --_nSessions;
 
@@ -317,6 +317,8 @@ void SessionPool::shutdown()
 	if (_shutdown.exchange(true)) return;
 	_shutdown = true;
 	_janitorTimer.stop();
+
+	Poco::Mutex::ScopedLock lock(_mutex);
 	closeAll(_idleSessions);
 	closeAll(_activeSessions);
 }

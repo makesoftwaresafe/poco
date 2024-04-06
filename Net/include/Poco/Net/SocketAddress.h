@@ -208,6 +208,9 @@ public:
 			/// Maximum length in bytes of a socket address.
 	};
 
+	static bool isUnixLocal(const std::string& hostAndPort);
+		/// Returns true iff `hostAndPort` is an absolute file path.
+
 protected:
 	void init(const IPAddress& hostAddress, Poco::UInt16 portNumber);
 	void init(const std::string& hostAddress, Poco::UInt16 portNumber);
@@ -313,12 +316,12 @@ inline bool SocketAddress::operator != (const SocketAddress& socketAddress) cons
 }
 
 
-} } // namespace Poco::Net
-
-
 Net_API Poco::BinaryWriter& operator << (Poco::BinaryWriter& writer, const Poco::Net::SocketAddress& value);
 Net_API Poco::BinaryReader& operator >> (Poco::BinaryReader& reader, Poco::Net::SocketAddress& value);
 Net_API std::ostream& operator << (std::ostream& ostr, const Poco::Net::SocketAddress& address);
+
+
+} } // namespace Poco::Net
 
 
 #endif // Net_SocketAddress_INCLUDED

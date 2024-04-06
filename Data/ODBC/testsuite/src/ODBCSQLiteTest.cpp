@@ -130,7 +130,7 @@ void ODBCSQLiteTest::testNull()
 		recreateNullsTable("NOT NULL");
 		session().setFeature("autoBind", bindValue(i));
 		session().setFeature("autoExtract", bindValue(i+1));
-		_pExecutor->notNulls("HY000");
+		_pExecutor->notNulls({"HY000"});
 		i += 2;
 	}
 }
@@ -388,6 +388,8 @@ CppUnit::Test* ODBCSQLiteTest::suite()
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testDynamicAny);
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testSQLChannel);
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testSQLLogger);
+		CppUnit_addTest(pSuite, ODBCSQLiteTest, testAutoCommit);
+		CppUnit_addTest(pSuite, ODBCSQLiteTest, testTransactionIsolation);
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testSessionTransaction);
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testTransaction);
 		CppUnit_addTest(pSuite, ODBCSQLiteTest, testTransactor);
